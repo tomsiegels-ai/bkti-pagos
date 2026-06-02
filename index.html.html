@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BKTI · Carga de Horas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#1a1a2e; --paper:#f4f1ea; --card:#fffdf8; --line:#d9d2c4;
+    --accent:#c2410c; --accent-soft:#fde6d8; --green:#15803d; --muted:#6b6456;
+    --shadow:0 1px 2px rgba(26,26,46,.06),0 8px 24px rgba(26,26,46,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Iowan Old Style','Palatino Linotype',Georgia,serif;
+    background:var(--paper);color:var(--ink);line-height:1.5;
+    background-image:radial-gradient(circle at 1px 1px,rgba(26,26,46,.04) 1px,transparent 0);
+    background-size:22px 22px;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px}
+  header{display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:2px solid var(--ink);padding-bottom:16px;margin-bottom:28px;flex-wrap:wrap;gap:12px}
+  h1{font-size:30px;letter-spacing:-.5px;font-weight:700}
+  h1 .sub{display:block;font-size:13px;font-weight:400;color:var(--muted);
+    letter-spacing:.18em;text-transform:uppercase;font-family:ui-sans-serif,system-ui}
+  .tabs{display:flex;gap:4px}
+  .tab{font-family:ui-sans-serif,system-ui;font-size:13px;font-weight:600;
+    padding:9px 16px;border:1px solid var(--line);background:var(--card);
+    cursor:pointer;border-radius:8px;color:var(--muted);transition:.15s}
+  .tab.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .tab:hover:not(.active){border-color:var(--ink)}
+  .panel{display:none;animation:fade .3s ease}
+  .panel.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:24px;box-shadow:var(--shadow);margin-bottom:22px}
+  .card h2{font-size:18px;margin-bottom:4px}
+  .card .hint{font-family:ui-sans-serif,system-ui;font-size:13px;color:var(--muted);margin-bottom:18px}
+  label{font-family:ui-sans-serif,system-ui;font-size:12px;font-weight:600;
+    color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px}
+  input,select{font-family:ui-sans-serif,system-ui;font-size:15px;padding:10px 12px;
+    border:1px solid var(--line);border-radius:8px;background:#fff;width:100%;color:var(--ink)}
+  input:focus,select:focus{outline:2px solid var(--accent);border-color:var(--accent)}
+  .row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+  .row>div{flex:1;min-width:140px}
+  .btn{font-family:ui-sans-serif,system-ui;font-size:14px;font-weight:600;
+    padding:11px 20px;border:none;border-radius:9px;cursor:pointer;transition:.15s}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{background:#9a3412}
+  .btn-dark{background:var(--ink);color:var(--paper)}
+  .btn-dark:hover{opacity:.88}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  .btn-ghost:hover{border-color:var(--ink)}
+  .btn-sm{padding:6px 12px;font-size:12px}
+  table{width:100%;border-collapse:collapse;font-family:ui-sans-serif,system-ui;font-size:14px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr:hover td{background:rgba(194,65,12,.03)}
+  .pill{display:inline-block;font-family:ui-sans-serif,system-ui;font-size:11px;
+    padding:2px 9px;border-radius:20px;background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .empty{text-align:center;color:var(--muted);padding:30px;font-family:ui-sans-serif,system-ui;font-size:14px}
+  .grid-locales{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0 18px}
+  .local-row{display:grid;grid-template-columns:1.6fr 1fr 1fr 1.1fr;gap:10px;align-items:center;
+    padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+  .local-row .lname{font-weight:600;font-family:ui-sans-serif,system-ui;font-size:14px}
+  .local-row .calc{font-family:ui-sans-serif,system-ui;font-size:13px;color:var(--green);
+    text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+  .head-mini{font-family:ui-sans-serif,system-ui;font-size:10px;text-transform:uppercase;
+    letter-spacing:.05em;color:var(--muted);text-align:center}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
+    background:var(--ink);color:var(--paper);padding:13px 22px;border-radius:10px;
+    font-family:ui-sans-serif,system-ui;font-size:14px;box-shadow:var(--shadow);
+    transition:transform .3s ease;z-index:50}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+  .total-bar{display:flex;justify-content:space-between;align-items:center;
+    padding:14px 18px;background:var(--ink);color:var(--paper);border-radius:10px;
+    font-family:ui-sans-serif,system-ui;margin-top:6px}
+  .total-bar .amt{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+  .actions{display:flex;gap:10px;flex-wrap:wrap}
+  .del{color:var(--accent);cursor:pointer;font-size:12px;font-family:ui-sans-serif,system-ui;
+    border:none;background:none;font-weight:600}
+  .seed-note{font-family:ui-sans-serif,system-ui;font-size:12px;color:var(--muted);
+    margin-top:10px;font-style:italic}
+  @media(max-width:620px){.local-row{grid-template-columns:1fr 1fr;gap:8px}
+    .local-row .lname{grid-column:1/-1}.local-row .calc{grid-column:1/-1;text-align:left}}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="login-screen" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px">
+  <div class="card" style="max-width:420px;width:100%">
+    <h1 style="font-size:26px;margin-bottom:4px">Pagos Instructores<span class="sub">BKTI · Acceso</span></h1>
+    <p class="hint" style="margin-top:8px">Ingresá con tu correo y contraseña. Si sos administrador, usá tu correo de administrador.</p>
+
+    <div id="login-prof">
+      <div style="margin-bottom:12px"><label>Correo</label><input id="lg-mail" type="email" placeholder="tucorreo@ejemplo.cl" autocomplete="username"></div>
+      <div style="margin-bottom:16px"><label>Contraseña</label><input id="lg-pass" type="password" placeholder="••••••" autocomplete="current-password"></div>
+      <button class="btn btn-primary" id="lg-enter" style="width:100%">Entrar</button>
+      <p id="lg-error" style="color:var(--accent);font-family:ui-sans-serif,system-ui;font-size:13px;margin-top:10px;display:none"></p>
+      <p style="text-align:center;margin-top:14px"><button class="del" id="lg-toadmin">Soy administrador →</button></p>
+    </div>
+
+    <div id="login-admin" style="display:none">
+      <div style="margin-bottom:12px"><label>Correo de administrador</label><input id="lg-admin-mail" type="email" placeholder="admin@bkti.cl" autocomplete="username"></div>
+      <div style="margin-bottom:16px"><label>Contraseña</label><input id="lg-admin-pass" type="password" placeholder="••••••" autocomplete="current-password"></div>
+      <button class="btn btn-dark" id="lg-admin-enter" style="width:100%">Entrar como administrador</button>
+      <p id="lg-admin-error" style="color:var(--accent);font-family:ui-sans-serif,system-ui;font-size:13px;margin-top:10px;display:none"></p>
+      <p class="seed-note" style="margin-top:10px">Primer acceso (antes de importar): admin@bkti.cl / BKTI2024</p>
+      <p style="text-align:center;margin-top:14px"><button class="del" id="lg-toprof">← Soy profesor</button></p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ CAMBIO DE CONTRASEÑA (1ª vez) ============ -->
+<div id="changepass-screen" style="min-height:100vh;display:none;align-items:center;justify-content:center;padding:24px">
+  <div class="card" style="max-width:420px;width:100%">
+    <h1 style="font-size:24px;margin-bottom:4px">Cambiá tu contraseña<span class="sub">Primer ingreso</span></h1>
+    <p class="hint" style="margin-top:8px">Esta es tu primera vez. Definí una contraseña nueva para tu cuenta.</p>
+    <div style="margin-bottom:12px"><label>Nueva contraseña</label><input id="cp-pass1" type="password" placeholder="••••••"></div>
+    <div style="margin-bottom:16px"><label>Repetir contraseña</label><input id="cp-pass2" type="password" placeholder="••••••"></div>
+    <button class="btn btn-primary" id="cp-save" style="width:100%">Guardar y continuar</button>
+    <p id="cp-error" style="color:var(--accent);font-family:ui-sans-serif,system-ui;font-size:13px;margin-top:10px;display:none"></p>
+  </div>
+</div>
+
+<div class="wrap" id="app-wrap" style="display:none">
+  <header>
+    <h1>Pagos Instructores<span class="sub" id="hdr-sub">BKTI · Carga mensual de horas</span></h1>
+    <div class="tabs" id="tabs-admin">
+      <button class="tab active" data-tab="carga">Carga</button>
+      <button class="tab" data-tab="resumen">Resumen mes</button>
+      <button class="tab" data-tab="maestros">Maestros</button>
+      <button class="tab" id="btn-logout" style="border-color:var(--accent);color:var(--accent)">Salir</button>
+    </div>
+  </header>
+
+  <!-- ============ CARGA ============ -->
+  <section class="panel active" id="carga">
+    <div class="card">
+      <h2>Registrar horas del mes</h2>
+      <p class="hint" id="carga-hint">Ingresá las horas por local. El monto se calcula con tu valor hora.</p>
+      <div class="row">
+        <div id="c-instructor-wrap">
+          <label>Instructor</label>
+          <select id="c-instructor"></select>
+        </div>
+        <div id="c-instructor-fixed" style="display:none">
+          <label>Instructor</label>
+          <div style="font-family:ui-sans-serif,system-ui;font-size:17px;font-weight:600;padding:10px 0" id="c-instructor-name">—</div>
+        </div>
+        <div>
+          <label>Mes</label>
+          <input type="month" id="c-mes">
+        </div>
+      </div>
+
+      <div class="local-row" style="background:transparent;border:none;padding-bottom:0">
+        <span class="lname"></span>
+        <span class="head-mini">Horas normales</span>
+        <span class="head-mini">Horas especiales<br>(Vie PM / Sáb)</span>
+        <span class="head-mini">Monto</span>
+      </div>
+      <div class="grid-locales" id="c-locales"></div>
+
+      <div class="total-bar">
+        <span>Total líquido del instructor en el mes</span>
+        <span class="amt" id="c-total">$0</span>
+      </div>
+      <div class="total-bar" style="background:var(--accent);margin-top:8px" id="c-bruto-bar">
+        <span>Total Bruto Boleta <span style="opacity:.7;font-size:12px">(líquido ÷ 0,8475)</span></span>
+        <span class="amt" id="c-bruto">$0</span>
+      </div>
+      <div class="actions" style="margin-top:18px">
+        <button class="btn btn-primary" id="c-guardar">Guardar carga</button>
+        <button class="btn btn-ghost" id="c-limpiar">Limpiar</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RESUMEN ============ -->
+  <section class="panel" id="resumen">
+    <div class="card">
+      <h2>Resumen del mes</h2>
+      <p class="hint">Vista previa del Excel: una fila por instructor, una columna de monto por local.</p>
+      <div class="row">
+        <div style="max-width:220px">
+          <label>Mes a mostrar</label>
+          <input type="month" id="r-mes">
+        </div>
+        <div style="flex:0;align-self:flex-end">
+          <button class="btn btn-dark" id="r-export">↓ Exportar a Excel</button>
+        </div>
+        <div style="flex:0;align-self:flex-end">
+          <button class="btn btn-dark" id="r-backup">↓ Respaldo completo a Excel</button>
+        </div>
+        <div style="flex:0;align-self:flex-end">
+          <button class="btn btn-ghost" id="r-restore-btn">↑ Restaurar desde Excel</button>
+          <input type="file" id="r-restore-file" accept=".xlsx,.xls" style="display:none">
+        </div>
+      </div>
+      <p class="hint" style="margin-top:-6px">El respaldo completo incluye las hojas Cargas, Resumen, Maestro y Extras Workout. "Exportar a Excel" es solo el resumen de pagos del mes.</p>
+      <div id="r-tabla"></div>
+    </div>
+  </section>
+
+  <!-- ============ MAESTROS ============ -->
+  <section class="panel" id="maestros">
+    <div class="card">
+      <h2>Instructores</h2>
+      <p class="hint">Cada instructor tiene su correo, contraseña, valor hora normal y valor hora especial (viernes PM / sábado). La contraseña se genera sola; podés cambiarla.</p>
+      <div class="row">
+        <div><label>Nombre</label><input id="m-nombre" placeholder="Nombre y apellido"></div>
+        <div><label>Correo</label><input id="m-mail" type="email" placeholder="correo@ejemplo.cl"></div>
+        <div><label>Tipo</label><select id="m-tipo"><option>Boleta</option><option>Contrato</option></select></div>
+        <div><label>Valor hora normal</label><input type="number" id="m-vhn" placeholder="0"></div>
+        <div><label>Valor hora especial</label><input type="number" id="m-vhe" placeholder="0"></div>
+        <div style="flex:0"><button class="btn btn-primary" id="m-add">Agregar</button></div>
+      </div>
+      <div id="m-tabla"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center">
+        <button class="btn btn-dark btn-sm" id="m-import-btn">↑ Importar desde Excel</button>
+        <input type="file" id="m-file" accept=".xlsx,.xls,.csv" style="display:none">
+        <button class="btn btn-dark btn-sm" id="m-export-btn">↓ Descargar maestro a Excel</button>
+        <button class="btn btn-ghost btn-sm" id="seed">Cargar instructores de ejemplo</button>
+        <span class="seed-note">El Excel puede tener 2 hojas: "Instructores" (Nombre · Valor Hora Normal · Valor Hora Extra · Mail · Estado · Tipo Contrato) y "Administradores" (Nombre · Mail · Password). Sin correo = inactivo.</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Locales (centros de costo)</h2>
+      <p class="hint">Cada local se paga por separado. Aparecen como columnas en el Excel.</p>
+      <div class="row">
+        <div><label>Nombre del local</label><input id="l-nombre" placeholder="Nombre del local"></div>
+        <div style="flex:0"><button class="btn btn-primary" id="l-add">Agregar</button></div>
+      </div>
+      <div id="l-tabla"></div>
+    </div>
+    <div class="card">
+      <h2>Administradores</h2>
+      <p class="hint">Quienes entran al ambiente de administración (Resumen y Maestros) con su correo y contraseña.</p>
+      <div class="row">
+        <div><label>Nombre</label><input id="adm-nombre" placeholder="Nombre"></div>
+        <div><label>Correo</label><input id="adm-mail" type="email" placeholder="correo@ejemplo.cl"></div>
+        <div><label>Contraseña</label><input id="adm-newpass" placeholder="(se genera sola si lo dejás vacío)"></div>
+        <div style="flex:0"><button class="btn btn-primary" id="adm-add">Agregar</button></div>
+      </div>
+      <div id="adm-tabla"></div>
+    </div>
+    <div class="card">
+      <h2>Respaldo de datos</h2>
+      <p class="hint">Los datos cargados viven en este navegador. Descargá un respaldo cada cierto tiempo; si cambiás de equipo o se borra el navegador, lo restaurás acá.</p>
+      <div class="actions">
+        <button class="btn btn-dark" id="b-export">↓ Descargar respaldo (.json)</button>
+        <button class="btn btn-ghost" id="b-import-btn">↑ Restaurar respaldo</button>
+        <input type="file" id="b-file" accept=".json" style="display:none">
+      </div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const DB={
+  load:k=>JSON.parse(localStorage.getItem('bkti_'+k)||'null'),
+  save:(k,v)=>localStorage.setItem('bkti_'+k,JSON.stringify(v))
+};
+let instructores=DB.load('instructores')||[];
+let locales=DB.load('locales')||[
+  {nombre:'Workout',col:'Monto WorkOut'},
+  {nombre:'Pie Andino (Pilates Reformer)',col:'Monto Pie Andino'},
+  {nombre:'FitMe Pie Andino',col:'Monto FitMe Pie Andino'},
+  {nombre:'Distrito',col:'Monto Distrito'},
+  {nombre:'El Tranque',col:'Monto El Tranque'}
+];
+// Migración: si algún local quedó como string de una versión previa
+locales=locales.map(l=>typeof l==='string'?{nombre:l,col:'Monto '+l}:l);
+let cargas=DB.load('cargas')||{}; // { "2024-08": { instructorId: { localId:{hn,he} } } }
+let extrasWO=DB.load('extrasWO')||{}; // { "2024-08": {vanessa, carla, marketing} } montos editables por mes
+const DEFAULT_EXTRAS={vanessa:452000,carla:901667,marketing:178500};
+function getExtras(mes){const e=extrasWO[mes];return {vanessa:e&&e.vanessa!=null?e.vanessa:DEFAULT_EXTRAS.vanessa,carla:e&&e.carla!=null?e.carla:DEFAULT_EXTRAS.carla,marketing:e&&e.marketing!=null?e.marketing:DEFAULT_EXTRAS.marketing}}
+let admins=DB.load('admins')||null;
+let adminPassLegacy=DB.load('adminPass'); // versiones previas: clave única
+const uid=()=>Math.random().toString(36).slice(2,9);
+const fmt=n=>'$'+Math.round(n||0).toLocaleString('es-CL');
+const norm=s=>String(s==null?'':s).trim();
+// genera contraseña simple: 3 letras + 3 números, ej "bkt482"
+function genPass(){const a='abcdefghjkmnpqrstuvwxyz';let s='';for(let i=0;i<3;i++)s+=a[Math.floor(Math.random()*a.length)];for(let i=0;i<3;i++)s+=Math.floor(Math.random()*10);return s}
+function esActivo(i){return !!(i.mail&&i.mail.trim())} // sin correo = inactivo
+function esBoleta(i){return (i.tipo||'Boleta').toLowerCase().indexOf('contrato')===-1} // todo lo que no sea "contrato" = boleta
+// Migración instructores: agregar mail/pass/estado/tipo faltantes
+instructores=instructores.map(i=>{
+  const mail=i.mail||'';
+  return {id:i.id,nombre:i.nombre,vhn:i.vhn,vhe:i.vhe,mail,
+    tipo:i.tipo||'Boleta',
+    pass:i.pass||genPass(),mustChange:i.mustChange!==undefined?i.mustChange:true};
+});
+// Migración admins: si no hay lista, crear una desde la clave única previa
+if(!admins){
+  admins=[{id:uid(),nombre:'Administrador',mail:'admin@bkti.cl',pass:adminPassLegacy||'BKTI2024',placeholder:true}];
+}
+const persist=()=>{DB.save('instructores',instructores);DB.save('locales',locales);DB.save('cargas',cargas);DB.save('admins',admins);DB.save('extrasWO',extrasWO)};
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+
+// ===== sesión / roles =====
+let session=null; // {role:'admin', id} | {role:'prof', id}
+function show(el,disp='block'){document.getElementById(el).style.display=disp}
+function hide(el){document.getElementById(el).style.display='none'}
+
+// tabs
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');document.getElementById(t.dataset.tab).classList.add('active');
+  if(t.dataset.tab==='resumen')renderResumen();
+});
+
+// ----- maestros -----
+function renderInstructores(){
+  const sel=document.getElementById('c-instructor');
+  sel.innerHTML=instructores.length?instructores.map(i=>`<option value="${i.id}">${i.nombre}</option>`).join(''):'<option value="">— sin instructores —</option>';
+  const t=document.getElementById('m-tabla');
+  if(!instructores.length){t.innerHTML='<div class="empty">Aún no hay instructores.</div>';return}
+  t.innerHTML=`<table><thead><tr><th>Nombre</th><th>Estado</th><th>Correo</th><th>Tipo</th><th>Contraseña</th><th class="num">V. hora normal</th><th class="num">V. hora especial</th><th></th></tr></thead><tbody>${
+    instructores.map(i=>{const act=esActivo(i);return `<tr>
+      <td><input value="${(i.nombre||'').replace(/"/g,'&quot;')}" onchange="setIns('${i.id}','nombre',this.value)" style="font-size:13px;padding:6px 8px;min-width:150px"></td>
+      <td>${act?'<span class="pill" style="background:#dcfce7;color:#15803d">Activo</span>':'<span class="pill" style="background:#f1ede4;color:#6b6456">Inactivo</span>'}</td>
+      <td><input value="${i.mail||''}" placeholder="(sin correo = inactivo)" onchange="setIns('${i.id}','mail',this.value)" style="font-size:13px;padding:6px 8px;min-width:160px"></td>
+      <td><select onchange="setIns('${i.id}','tipo',this.value)" style="font-size:13px;padding:6px 8px"><option ${esBoleta(i)?'selected':''}>Boleta</option><option ${!esBoleta(i)?'selected':''}>Contrato</option></select></td>
+      <td><span style="font-family:ui-monospace,monospace;font-size:13px">${i.pass}</span>${i.mustChange?' <span class="pill">nueva</span>':''} <button class="del" onclick="regenPass('${i.id}')" title="Generar otra">↻</button></td>
+      <td class="num"><input type="number" value="${i.vhn||0}" onchange="setIns('${i.id}','vhn',this.value)" style="font-size:13px;padding:6px 8px;width:100px;text-align:right"></td>
+      <td class="num"><input type="number" value="${i.vhe||0}" onchange="setIns('${i.id}','vhe',this.value)" style="font-size:13px;padding:6px 8px;width:100px;text-align:right"></td>
+      <td class="num"><button class="del" onclick="delInstructor('${i.id}')">eliminar</button></td>
+    </tr>`}).join('')
+  }</tbody></table>`;
+}
+function renderLocales(){
+  const t=document.getElementById('l-tabla');
+  t.innerHTML=`<table><thead><tr><th>Local</th><th>Nombre de columna en Excel</th><th></th></tr></thead><tbody>${
+    locales.map((l,idx)=>`<tr><td>${l.nombre}</td><td><input value="${l.col}" onchange="setCol(${idx},this.value)" style="font-size:13px;padding:6px 8px"></td><td class="num"><button class="del" onclick="delLocal(${idx})">eliminar</button></td></tr>`).join('')
+  }</tbody></table>`;
+}
+window.setCol=(idx,v)=>{locales[idx].col=v.trim()||('Monto '+locales[idx].nombre);persist();};
+window.setIns=(id,campo,v)=>{
+  const i=instructores.find(x=>x.id===id);if(!i)return;
+  if(campo==='vhn'||campo==='vhe'){i[campo]=Number(v)||0}
+  else if(campo==='mail'){
+    const m=v.trim();
+    if(m&&instructores.some(x=>x.id!==id&&(x.mail||'').toLowerCase()===m.toLowerCase()))return toast('Ese correo ya está en uso');
+    i.mail=m;
+  }
+  else if(campo==='nombre'){const n=v.trim();if(!n)return toast('El nombre no puede quedar vacío');i.nombre=n}
+  else i[campo]=v.trim();
+  persist();renderInstructores();renderCargaLocales();
+};
+window.regenPass=(id)=>{const i=instructores.find(x=>x.id===id);if(i){i.pass=genPass();i.mustChange=true;persist();renderInstructores();toast('Nueva contraseña: '+i.pass)}};
+document.getElementById('m-add').onclick=()=>{
+  const n=document.getElementById('m-nombre').value.trim();
+  const mail=document.getElementById('m-mail').value.trim();
+  const tipo=document.getElementById('m-tipo').value;
+  const vhn=+document.getElementById('m-vhn').value||0, vhe=+document.getElementById('m-vhe').value||0;
+  if(!n)return toast('Falta el nombre');
+  if(mail&&instructores.some(x=>(x.mail||'').toLowerCase()===mail.toLowerCase()))return toast('Ese correo ya está en uso');
+  const pass=genPass();
+  instructores.push({id:uid(),nombre:n,mail,tipo,vhn,vhe,pass,mustChange:true});persist();
+  document.getElementById('m-nombre').value='';document.getElementById('m-mail').value='';document.getElementById('m-vhn').value='';document.getElementById('m-vhe').value='';
+  renderInstructores();renderCargaLocales();toast('Instructor agregado · contraseña '+pass);
+};
+window.delInstructor=id=>{instructores=instructores.filter(i=>i.id!==id);persist();renderInstructores();renderCargaLocales()};
+document.getElementById('l-add').onclick=()=>{
+  const n=document.getElementById('l-nombre').value.trim();
+  if(!n)return toast('Falta el nombre');
+  locales.push({nombre:n,col:'Monto '+n});persist();document.getElementById('l-nombre').value='';
+  renderLocales();renderCargaLocales();toast('Local agregado');
+};
+window.delLocal=idx=>{locales.splice(idx,1);persist();renderLocales();renderCargaLocales()};
+document.getElementById('seed').onclick=()=>{
+  const ej=[['Camila Avendaño',30000,40000],['Francisca Burgos',20000,28000],['Valentina Carrasco',25000,33000],
+    ['Karina Castillo',24000,32000],['Gilsa Castro',24000,32000],['Javiera Duran',22500,30000],
+    ['Carlos Figueroa',25000,33000],['Ekatherina Leventis',26000,34000],['Pavel Marquez',24000,32000],
+    ['Domenica Weiler',27500,36000]];
+  ej.forEach(([n,a,b])=>{if(!instructores.find(i=>i.nombre===n))instructores.push({id:uid(),nombre:n,mail:'',tipo:'Boleta',vhn:a,vhe:b,pass:genPass(),mustChange:true})});
+  persist();renderInstructores();renderCargaLocales();toast('Instructores de ejemplo cargados');
+};
+
+// ----- importar Excel maestro -----
+document.getElementById('m-import-btn').onclick=()=>document.getElementById('m-file').click();
+// mapea encabezados a índices según palabras clave (tolera espacios y mayúsculas)
+function mapHeaders(headerRow){
+  const idx={};
+  (headerRow||[]).forEach((h,c)=>{
+    const k=norm(h).toLowerCase();
+    if(k.includes('nombre'))idx.nombre=c;
+    else if(k.includes('correo')||k.includes('mail'))idx.mail=c;
+    else if(k.includes('contrato')||k.includes('tipo'))idx.tipo=c;
+    else if(k.includes('estado'))idx.estado=c;
+    else if(k.includes('password')||k.includes('contrase'))idx.pass=c;
+    else if(k.includes('normal')||k.includes('nomal'))idx.vhn=c;
+    else if(k.includes('extra')||k.includes('especial'))idx.vhe=c;
+  });
+  return idx;
+}
+const numCL=v=>{const n=Number(norm(v).replace(/\./g,'').replace(',','.').replace(/[^0-9.-]/g,''));return isNaN(n)?0:n};
+document.getElementById('m-file').onchange=ev=>{
+  const file=ev.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      // localizar hojas por nombre (tolerante)
+      const findSheet=re=>wb.SheetNames.find(n=>re.test(n.toLowerCase()));
+      const shInstr=findSheet(/instruct|profes/)||wb.SheetNames[0];
+      const shAdmin=findSheet(/admin/);
+
+      // --- Instructores ---
+      let nuevos=0,actualizados=0,saltados=0;
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[shInstr],{header:1,blankrows:false});
+      if(rows.length){
+        const idx=mapHeaders(rows[0]);
+        if(idx.nombre===undefined)idx.nombre=0; // respaldo
+        for(let r=1;r<rows.length;r++){
+          const row=rows[r];if(!row)continue;
+          const nombre=norm(row[idx.nombre]);if(!nombre)continue;
+          const mailVal=idx.mail!==undefined?norm(row[idx.mail]):'';
+          const vhn=idx.vhn!==undefined?numCL(row[idx.vhn]):0;
+          const vhe=idx.vhe!==undefined?numCL(row[idx.vhe]):0;
+          const passVal=idx.pass!==undefined?norm(row[idx.pass]):'';
+          const tipoVal=idx.tipo!==undefined?norm(row[idx.tipo]):'';
+          // estado: si hay columna estado la respetamos, pero sin correo siempre es inactivo
+          const ex=instructores.find(i=>i.nombre.toLowerCase()===nombre.toLowerCase());
+          if(ex){
+            ex.vhn=vhn;ex.vhe=vhe;ex.mail=mailVal;
+            if(tipoVal)ex.tipo=tipoVal;
+            if(passVal){ex.pass=passVal;ex.mustChange=true}
+            actualizados++;
+          }else{
+            instructores.push({id:uid(),nombre,mail:mailVal,vhn,vhe,tipo:tipoVal||'Boleta',pass:passVal||genPass(),mustChange:true});
+            nuevos++;
+          }
+        }
+      }
+
+      // --- Administradores ---
+      let adminMsg='';
+      if(shAdmin){
+        const ar=XLSX.utils.sheet_to_json(wb.Sheets[shAdmin],{header:1,blankrows:false});
+        if(ar.length){
+          const ai=mapHeaders(ar[0]);if(ai.nombre===undefined)ai.nombre=0;
+          let an=0,au=0;
+          for(let r=1;r<ar.length;r++){
+            const row=ar[r];if(!row)continue;
+            const nombre=norm(row[ai.nombre]);
+            const mail=ai.mail!==undefined?norm(row[ai.mail]):'';
+            const pass=ai.pass!==undefined?norm(row[ai.pass]):'';
+            if(!mail)continue;
+            const ex=admins.find(a=>(a.mail||'').toLowerCase()===mail.toLowerCase());
+            if(ex){ex.nombre=nombre||ex.nombre;if(pass)ex.pass=pass;au++}
+            else{admins.push({id:uid(),nombre:nombre||'Administrador',mail,pass:pass||genPass()});an++}
+          }
+          adminMsg=` · admins: ${an} nuevos, ${au} act.`;
+          // si entraron admins reales, descartar el placeholder inicial
+          if((an>0||au>0)&&admins.length>1)admins=admins.filter(a=>!a.placeholder);
+        }
+      }
+
+      persist();renderInstructores();renderAdmins();renderCargaLocales();
+      toast(`Instructores: ${nuevos} nuevos, ${actualizados} act.${adminMsg}`);
+    }catch(err){console.error(err);toast('No se pudo leer el archivo')}
+    ev.target.value='';
+  };
+  reader.readAsArrayBuffer(file);
+};
+
+// ----- descargar maestro a Excel -----
+document.getElementById('m-export-btn').onclick=()=>{
+  if(!instructores.length)return toast('No hay instructores para exportar');
+  const insHeader=['Nombre de Instructor','Valor Hora Nomal','Valor Hora Extra','Mail','Estado','Tipo Contrato'];
+  const insRows=[insHeader,...instructores.map(i=>[
+    i.nombre, i.vhn||0, i.vhe||0, i.mail||'', esActivo(i)?'Activo':'Inactivo', esBoleta(i)?'Boleta':'Contrato'
+  ])];
+  const admHeader=['Nombre','Mail','Password'];
+  const admRows=[admHeader,...admins.filter(a=>!a.placeholder||admins.length===1).map(a=>[a.nombre||'',a.mail||'',a.pass||''])];
+  const wb=XLSX.utils.book_new();
+  const wsI=XLSX.utils.aoa_to_sheet(insRows);
+  wsI['!cols']=[{wch:24},{wch:16},{wch:16},{wch:22},{wch:12},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,wsI,'Instructores');
+  const wsA=XLSX.utils.aoa_to_sheet(admRows);
+  wsA['!cols']=[{wch:20},{wch:22},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,wsA,'Administradores');
+  XLSX.writeFile(wb,`Maestro_Instructores_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('Maestro descargado ✓');
+};
+
+// ----- carga -----
+function activeInstructorId(){
+  if(session&&session.role==='prof')return session.id;
+  return document.getElementById('c-instructor').value;
+}
+function renderCargaLocales(){
+  const cont=document.getElementById('c-locales');
+  const iId=activeInstructorId();
+  const mes=document.getElementById('c-mes').value;
+  const prev=(cargas[mes]&&cargas[mes][iId])||{};
+  cont.innerHTML=locales.map((l,idx)=>{
+    const p=prev[idx]||{hn:'',he:''};
+    return `<div class="local-row">
+      <span class="lname">${l.nombre}</span>
+      <input type="number" min="0" class="c-hn" data-idx="${idx}" placeholder="0" value="${p.hn}">
+      <input type="number" min="0" class="c-he" data-idx="${idx}" placeholder="0" value="${p.he}">
+      <span class="calc" id="calc-${idx}">$0</span>
+    </div>`;
+  }).join('');
+  cont.querySelectorAll('input').forEach(inp=>inp.oninput=recalc);
+  recalc();
+}
+function currentInstructor(){return instructores.find(i=>i.id===activeInstructorId())}
+function recalc(){
+  const ins=currentInstructor();let total=0;
+  locales.forEach((l,idx)=>{
+    const hn=+document.querySelector(`.c-hn[data-idx="${idx}"]`).value||0;
+    const he=+document.querySelector(`.c-he[data-idx="${idx}"]`).value||0;
+    const m=ins?hn*ins.vhn+he*ins.vhe:0;total+=m;
+    document.getElementById('calc-'+idx).textContent=fmt(m);
+  });
+  document.getElementById('c-total').textContent=fmt(total);
+  const bar=document.getElementById('c-bruto-bar');
+  if(ins&&!esBoleta(ins)){bar.style.display='none'}
+  else{bar.style.display='';document.getElementById('c-bruto').textContent=fmt(total/(1-0.1525))}
+}
+document.getElementById('c-instructor').onchange=renderCargaLocales;
+document.getElementById('c-mes').onchange=renderCargaLocales;
+document.getElementById('c-guardar').onclick=()=>{
+  const iId=activeInstructorId(), mes=document.getElementById('c-mes').value;
+  if(!iId)return toast('Elegí un instructor');
+  if(!mes)return toast('Elegí un mes');
+  const data={};
+  locales.forEach((l,idx)=>{
+    const hn=+document.querySelector(`.c-hn[data-idx="${idx}"]`).value||0;
+    const he=+document.querySelector(`.c-he[data-idx="${idx}"]`).value||0;
+    if(hn||he)data[idx]={hn,he};
+  });
+  cargas[mes]=cargas[mes]||{};cargas[mes][iId]=data;persist();
+  toast('Carga guardada ✓');
+};
+document.getElementById('c-limpiar').onclick=()=>{document.querySelectorAll('#c-locales input').forEach(i=>i.value='');recalc()};
+
+// ----- resumen + export -----
+function montoCarga(ins,c){return c?(c.hn||0)*ins.vhn+(c.he||0)*ins.vhe:0}
+// índice de la columna Workout (por nombre); -1 si no existe
+function idxWorkout(){return locales.findIndex(l=>(l.nombre||'').toLowerCase().includes('workout'))}
+// calcula las filas extra de Workout para un mes dado
+function calcExtrasWorkout(mes){
+  const wo=idxWorkout();
+  const cargaMes=cargas[mes]||{};
+  let liqBoleta=0, liqContrato=0;
+  if(wo>=0){
+    instructores.forEach(ins=>{
+      const cI=cargaMes[ins.id]||{};
+      const m=montoCarga(ins,cI[wo]);
+      if(!m)return;
+      if(esBoleta(ins))liqBoleta+=m; else liqContrato+=m;
+    });
+  }
+  const ex=getExtras(mes);
+  const boletas=liqBoleta/(1-0.1525)-liqBoleta; // (líquido/0,8475) − líquido
+  const previred=liqContrato*0.274;
+  return {
+    wo,
+    rows:[
+      {key:'vanessa',label:'Vanessa Flores',monto:ex.vanessa,editable:true},
+      {key:'carla',label:'Carla Ochoa',monto:ex.carla,editable:true},
+      {key:'marketing',label:'Marketing Bloom',monto:ex.marketing,editable:true},
+      {key:'boletas',label:'Boletas',monto:boletas,editable:false},
+      {key:'previred',label:'Previred',monto:previred,editable:false}
+    ],
+    totalExtras:ex.vanessa+ex.carla+ex.marketing+boletas+previred
+  };
+}
+window.setExtra=(mes,key,v)=>{
+  if(!extrasWO[mes])extrasWO[mes]={};
+  extrasWO[mes][key]=Number(v)||0;persist();renderResumen();
+};
+function renderResumen(){
+  const mes=document.getElementById('r-mes').value;
+  const cont=document.getElementById('r-tabla');
+  if(!mes){cont.innerHTML='<div class="empty">Elegí un mes.</div>';return}
+  if(!instructores.length){cont.innerHTML='<div class="empty">No hay instructores en el maestro.</div>';return}
+  const cargaMes=cargas[mes]||{};
+  const totLocal=locales.map(()=>0);let totGeneral=0;
+  const filas=instructores.map(ins=>{
+    const cI=cargaMes[ins.id]||{};
+    let liq=0;
+    const tds=locales.map((l,idx)=>{const m=montoCarga(ins,cI[idx]);liq+=m;totLocal[idx]+=m;
+      return `<td class="num">${m?fmt(m):'—'}</td>`}).join('');
+    totGeneral+=liq;
+    return `<tr><td>${ins.nombre}</td>${tds}<td class="num"><strong>${liq?fmt(liq):'—'}</strong></td></tr>`;
+  }).join('');
+  // fila de total por local (instructores)
+  const totalRow=`<tr><td><strong>Total por local</strong></td>${locales.map((l,idx)=>`<td class="num"><strong>${fmt(totLocal[idx])}</strong></td>`).join('')}<td class="num"><strong>${fmt(totGeneral)}</strong></td></tr>`;
+  // filas extra de Workout
+  const ext=calcExtrasWorkout(mes);
+  const nCols=locales.length; // columnas de locales
+  let extraRows='';
+  if(ext.wo>=0){
+    extraRows=ext.rows.map(r=>{
+      const celdas=locales.map((l,idx)=>{
+        if(idx!==ext.wo)return '<td class="num">—</td>';
+        if(r.editable)return `<td class="num"><input type="number" value="${Math.round(r.monto)}" onchange="setExtra('${mes}','${r.key}',this.value)" style="font-size:13px;padding:5px 7px;width:110px;text-align:right"></td>`;
+        return `<td class="num">${fmt(r.monto)}</td>`;
+      }).join('');
+      const nota=r.editable?'':' <span class="hint" style="font-size:11px">(calculado)</span>';
+      return `<tr style="background:rgba(194,65,12,.04)"><td>${r.label}${nota}</td>${celdas}<td class="num">—</td></tr>`;
+    }).join('');
+  }
+  // total Workout con extras
+  let totalWOconExtras='';
+  if(ext.wo>=0){
+    const totalWO=totLocal[ext.wo]+ext.totalExtras;
+    const celdas=locales.map((l,idx)=>idx===ext.wo?`<td class="num"><strong>${fmt(totalWO)}</strong></td>`:'<td class="num">—</td>').join('');
+    totalWOconExtras=`<tr style="border-top:2px solid var(--ink)"><td><strong>Total Workout (con extras)</strong></td>${celdas}<td class="num">—</td></tr>`;
+  }
+  cont.innerHTML=`<table><thead><tr><th>Instructor</th>${locales.map(l=>`<th class="num">${l.nombre}</th>`).join('')}<th class="num">Líquido a pagar</th></tr></thead>
+    <tbody>${filas}</tbody>
+    <tfoot>${totalRow}${extraRows}${totalWOconExtras}</tfoot></table>`;
+}
+document.getElementById('r-mes').onchange=renderResumen;
+document.getElementById('r-export').onclick=()=>{
+  const mes=document.getElementById('r-mes').value;
+  if(!mes)return toast('Elegí un mes');
+  if(!instructores.length)return toast('No hay instructores para exportar');
+  const cargaMes=cargas[mes]||{};
+  const header=['Nombre de Instructor',...locales.map(l=>l.col),'Monto Líquido a Pagar'];
+  const rows=[header];const totLocal=locales.map(()=>0);let totGen=0;
+  instructores.forEach(ins=>{
+    const cI=cargaMes[ins.id]||{};let liq=0;
+    const r=[ins.nombre];
+    locales.forEach((l,idx)=>{const m=montoCarga(ins,cI[idx]);liq+=m;totLocal[idx]+=m;r.push(m||'')});
+    r.push(liq||'');totGen+=liq;rows.push(r);
+  });
+  const totRow=['Total Líquido a pagar',...totLocal,totGen];rows.push(totRow);
+  // filas extra de Workout
+  const ext=calcExtrasWorkout(mes);
+  if(ext.wo>=0){
+    ext.rows.forEach(r=>{
+      const fila=[r.label,...locales.map((l,idx)=>idx===ext.wo?Math.round(r.monto):''),''];
+      rows.push(fila);
+    });
+    const totalWO=totLocal[ext.wo]+ext.totalExtras;
+    rows.push(['Total Workout (con extras)',...locales.map((l,idx)=>idx===ext.wo?Math.round(totalWO):''),'']);
+  }
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:24},...locales.map(()=>({wch:16})),{wch:20}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,mes);
+  XLSX.writeFile(wb,`Pagos_Instructores_${mes}.xlsx`);
+  toast('Excel descargado ✓');
+};
+
+// ----- respaldo completo a Excel (multi-hoja) -----
+// arma las filas del resumen de un mes (mismas que el export normal)
+function resumenRows(mes){
+  const cargaMes=cargas[mes]||{};
+  const header=['Nombre de Instructor',...locales.map(l=>l.col),'Monto Líquido a Pagar'];
+  const rows=[header];const totLocal=locales.map(()=>0);let totGen=0;
+  instructores.forEach(ins=>{
+    const cI=cargaMes[ins.id]||{};let liq=0;
+    const r=[ins.nombre];
+    locales.forEach((l,idx)=>{const m=montoCarga(ins,cI[idx]);liq+=m;totLocal[idx]+=m;r.push(m||'')});
+    r.push(liq||'');totGen+=liq;rows.push(r);
+  });
+  rows.push(['Total Líquido a pagar',...totLocal,totGen]);
+  const ext=calcExtrasWorkout(mes);
+  if(ext.wo>=0){
+    ext.rows.forEach(r=>rows.push([r.label,...locales.map((l,idx)=>idx===ext.wo?Math.round(r.monto):''),'']));
+    rows.push(['Total Workout (con extras)',...locales.map((l,idx)=>idx===ext.wo?Math.round(totLocal[ext.wo]+ext.totalExtras):''),'']);
+  }
+  return rows;
+}
+function nombreLocal(idx){return locales[idx]?locales[idx].nombre:('Local '+idx)}
+function hacerRespaldoCompleto(meses){
+  const wb=XLSX.utils.book_new();
+  // Hoja Cargas (fuente de verdad): Mes · Instructor · Local · Horas Normales · Horas Especiales
+  const cargasRows=[['Mes','Instructor','Local','Horas Normales','Horas Especiales']];
+  meses.forEach(mes=>{
+    const cm=cargas[mes]||{};
+    instructores.forEach(ins=>{
+      const cI=cm[ins.id];if(!cI)return;
+      locales.forEach((l,idx)=>{
+        const c=cI[idx];if(!c)return;
+        if((c.hn||0)||(c.he||0))cargasRows.push([mes,ins.nombre,nombreLocal(idx),c.hn||0,c.he||0]);
+      });
+    });
+  });
+  const wsC=XLSX.utils.aoa_to_sheet(cargasRows);
+  wsC['!cols']=[{wch:10},{wch:24},{wch:26},{wch:16},{wch:16}];
+  XLSX.utils.book_append_sheet(wb,wsC,'Cargas');
+  // Hoja Resumen: si es un solo mes, ese; si son varios, el último (con encabezado de mes)
+  const resumenAll=[];
+  meses.forEach(mes=>{
+    resumenAll.push(['Mes: '+mes]);
+    resumenRows(mes).forEach(r=>resumenAll.push(r));
+    resumenAll.push([]);
+  });
+  const wsR=XLSX.utils.aoa_to_sheet(resumenAll);
+  wsR['!cols']=[{wch:24},...locales.map(()=>({wch:16})),{wch:20}];
+  XLSX.utils.book_append_sheet(wb,wsR,'Resumen');
+  // Hoja Maestro (instructores) + Administradores en la misma hoja, separados
+  const maestroRows=[['Nombre de Instructor','Valor Hora Nomal','Valor Hora Extra','Mail','Estado','Tipo Contrato']];
+  instructores.forEach(i=>maestroRows.push([i.nombre,i.vhn||0,i.vhe||0,i.mail||'',esActivo(i)?'Activo':'Inactivo',esBoleta(i)?'Boleta':'Contrato']));
+  maestroRows.push([]);maestroRows.push(['ADMINISTRADORES']);maestroRows.push(['Nombre','Mail','Password']);
+  admins.filter(a=>!a.placeholder||admins.length===1).forEach(a=>maestroRows.push([a.nombre||'',a.mail||'',a.pass||'']));
+  const wsM=XLSX.utils.aoa_to_sheet(maestroRows);
+  wsM['!cols']=[{wch:24},{wch:16},{wch:16},{wch:22},{wch:12},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,wsM,'Maestro');
+  // Hoja Extras Workout: Mes · Vanessa Flores · Carla Ochoa · Marketing Bloom
+  const extrasRows=[['Mes','Vanessa Flores','Carla Ochoa','Marketing Bloom']];
+  meses.forEach(mes=>{const e=getExtras(mes);extrasRows.push([mes,e.vanessa,e.carla,e.marketing])});
+  const wsE=XLSX.utils.aoa_to_sheet(extrasRows);
+  wsE['!cols']=[{wch:10},{wch:16},{wch:16},{wch:16}];
+  XLSX.utils.book_append_sheet(wb,wsE,'Extras Workout');
+  const sufijo=meses.length===1?meses[0]:'historico';
+  XLSX.writeFile(wb,`Respaldo_BKTI_${sufijo}.xlsx`);
+  toast('Respaldo completo descargado ✓');
+}
+document.getElementById('r-backup').onclick=()=>{
+  const mes=document.getElementById('r-mes').value;
+  const todos=Object.keys(cargas).filter(m=>cargas[m]&&Object.keys(cargas[m]).length).sort();
+  if(!todos.length&&!mes)return toast('No hay datos para respaldar');
+  // elegir alcance
+  const opt=confirm('¿Respaldar TODO el histórico?\n\nAceptar = todos los meses con datos.\nCancelar = solo el mes seleccionado ('+(mes||'—')+').');
+  if(opt){hacerRespaldoCompleto(todos.length?todos:[mes])}
+  else{if(!mes)return toast('Elegí un mes');hacerRespaldoCompleto([mes])}
+};
+
+// ----- restaurar desde Excel (lee hoja Cargas) -----
+document.getElementById('r-restore-btn').onclick=()=>document.getElementById('r-restore-file').click();
+document.getElementById('r-restore-file').onchange=ev=>{
+  const file=ev.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const shCargas=wb.SheetNames.find(n=>/carga/i.test(n));
+      if(!shCargas){toast('El archivo no tiene hoja "Cargas"');ev.target.value='';return}
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[shCargas],{header:1,blankrows:false});
+      if(rows.length<2){toast('La hoja Cargas está vacía');ev.target.value='';return}
+      // detectar columnas por palabra clave
+      const H=rows[0].map(x=>norm(x).toLowerCase());
+      const col=(...keys)=>H.findIndex(h=>keys.some(k=>h.includes(k)));
+      const cMes=col('mes'), cIns=col('instructor','nombre'), cLoc=col('local'),
+            cHn=col('normal','nomal'), cHe=col('especial','extra');
+      if([cMes,cIns,cLoc,cHn,cHe].some(c=>c<0)){toast('Faltan columnas en la hoja Cargas');ev.target.value='';return}
+      // agrupar por mes
+      const porMes={};const noEncontrados=new Set();
+      for(let r=1;r<rows.length;r++){
+        const row=rows[r];if(!row)continue;
+        const mes=norm(row[cMes]);const nombre=norm(row[cIns]);const locName=norm(row[cLoc]);
+        if(!mes||!nombre)continue;
+        const ins=instructores.find(i=>i.nombre.toLowerCase()===nombre.toLowerCase());
+        if(!ins){noEncontrados.add(nombre);continue}
+        const li=locales.findIndex(l=>(l.nombre||'').toLowerCase()===locName.toLowerCase());
+        if(li<0){noEncontrados.add('local: '+locName);continue}
+        const hn=numCL(row[cHn]), he=numCL(row[cHe]);
+        if(!hn&&!he)continue;
+        porMes[mes]=porMes[mes]||{};porMes[mes][ins.id]=porMes[mes][ins.id]||{};
+        porMes[mes][ins.id][li]={hn,he};
+      }
+      const meses=Object.keys(porMes);
+      if(!meses.length){toast('No se pudo leer ninguna carga válida');ev.target.value='';return}
+      // preguntar antes de sobrescribir meses existentes
+      const yaExisten=meses.filter(m=>cargas[m]&&Object.keys(cargas[m]).length);
+      if(yaExisten.length){
+        if(!confirm('Estos meses ya tienen datos y serán reemplazados:\n'+yaExisten.join(', ')+'\n\n¿Continuar?')){ev.target.value='';return}
+      }
+      meses.forEach(m=>{cargas[m]=porMes[m]});
+      // restaurar extras workout si la hoja existe
+      const shExtras=wb.SheetNames.find(n=>/extra/i.test(n));
+      if(shExtras){
+        const er=XLSX.utils.sheet_to_json(wb.Sheets[shExtras],{header:1,blankrows:false});
+        if(er.length>1){
+          const eh=er[0].map(x=>norm(x).toLowerCase());
+          const em=eh.findIndex(h=>h.includes('mes')),ev_=eh.findIndex(h=>h.includes('vanessa')),
+                ec=eh.findIndex(h=>h.includes('carla')),emk=eh.findIndex(h=>h.includes('marketing'));
+          for(let r=1;r<er.length;r++){const row=er[r];if(!row)continue;const m=norm(row[em]);if(!m)continue;
+            extrasWO[m]={vanessa:numCL(row[ev_]),carla:numCL(row[ec]),marketing:numCL(row[emk])}}
+        }
+      }
+      persist();renderResumen();renderCargaLocales();
+      let msg=`Restaurados ${meses.length} mes(es): ${meses.join(', ')}`;
+      if(noEncontrados.size)msg+=` · ${noEncontrados.size} no encontrados (omitidos)`;
+      toast(msg);
+    }catch(err){console.error(err);toast('No se pudo leer el archivo')}
+    ev.target.value='';
+  };
+  reader.readAsArrayBuffer(file);
+};
+
+// ----- respaldo / restauración -----
+document.getElementById('b-export').onclick=()=>{
+  const data={version:4,exported:new Date().toISOString(),instructores,locales,cargas,admins,extrasWO};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`bkti-respaldo-${new Date().toISOString().slice(0,10)}.json`;a.click();
+  URL.revokeObjectURL(a.href);toast('Respaldo descargado ✓');
+};
+document.getElementById('b-import-btn').onclick=()=>document.getElementById('b-file').click();
+document.getElementById('b-file').onchange=ev=>{
+  const file=ev.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      if(!d.instructores||!d.locales)throw new Error('formato');
+      if(!confirm('Esto reemplazará los datos actuales por los del respaldo. ¿Continuar?')){ev.target.value='';return}
+      instructores=d.instructores;locales=d.locales;cargas=d.cargas||{};extrasWO=d.extrasWO||{};
+      if(Array.isArray(d.admins)&&d.admins.length)admins=d.admins;
+      else if(d.adminPass)admins=[{id:uid(),nombre:'Administrador',mail:'admin@bkti.cl',pass:d.adminPass}];
+      locales=locales.map(l=>typeof l==='string'?{nombre:l,col:'Monto '+l}:l);
+      instructores=instructores.map(i=>({id:i.id,nombre:i.nombre,vhn:i.vhn,vhe:i.vhe,mail:i.mail||'',tipo:i.tipo||'Boleta',pass:i.pass||genPass(),mustChange:i.mustChange!==undefined?i.mustChange:true}));
+      persist();renderInstructores();renderLocales();renderCargaLocales();
+      toast('Respaldo restaurado ✓');
+    }catch(err){console.error(err);toast('Archivo de respaldo inválido')}
+    ev.target.value='';
+  };
+  reader.readAsText(file);
+};
+
+// ===== LOGIN / ROLES =====
+const now=new Date().toISOString().slice(0,7);
+document.getElementById('c-mes').value=now;document.getElementById('r-mes').value=now;
+
+function applyRole(){
+  const sub=document.getElementById('hdr-sub');
+  const isProf=session.role==='prof';
+  // tabs visibles según rol
+  document.querySelectorAll('#tabs-admin .tab').forEach(t=>{
+    if(t.id==='btn-logout')return;
+    const isCarga=t.dataset.tab==='carga';
+    t.style.display=(isProf&&!isCarga)?'none':'';
+  });
+  // selector vs nombre fijo
+  document.getElementById('c-instructor-wrap').style.display=isProf?'none':'';
+  document.getElementById('c-instructor-fixed').style.display=isProf?'block':'none';
+  if(isProf){
+    const ins=instructores.find(i=>i.id===session.id);
+    document.getElementById('c-instructor-name').textContent=ins?ins.nombre:'—';
+    document.getElementById('carga-hint').textContent='Ingresá tus horas por local. El monto se calcula con tu valor hora.';
+    sub.textContent='BKTI · Registro de horas del mes';
+    // forzar pestaña carga activa
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    document.querySelector('.tab[data-tab="carga"]').classList.add('active');
+    document.getElementById('carga').classList.add('active');
+  }else{
+    sub.textContent='BKTI · Administración';
+    renderAdmins();
+  }
+  renderInstructores();renderLocales();renderCargaLocales();
+}
+function enterApp(){
+  hide('login-screen');hide('changepass-screen');
+  document.getElementById('app-wrap').style.display='block';
+  applyRole();
+}
+function doLogout(){
+  session=null;
+  document.getElementById('app-wrap').style.display='none';
+  hide('changepass-screen');
+  document.getElementById('lg-mail').value='';document.getElementById('lg-pass').value='';
+  document.getElementById('lg-admin-mail').value='';
+  document.getElementById('lg-admin-pass').value='';
+  document.getElementById('lg-error').style.display='none';
+  document.getElementById('lg-admin-error').style.display='none';
+  show('login-screen','flex');
+}
+
+// alternar profe/admin en login
+document.getElementById('lg-toadmin').onclick=()=>{hide('login-prof');show('login-admin')};
+document.getElementById('lg-toprof').onclick=()=>{hide('login-admin');show('login-prof')};
+
+// login profesor
+document.getElementById('lg-enter').onclick=()=>{
+  const mail=document.getElementById('lg-mail').value.trim().toLowerCase();
+  const pass=document.getElementById('lg-pass').value;
+  const err=document.getElementById('lg-error');
+  const ins=instructores.find(i=>(i.mail||'').toLowerCase()===mail);
+  if(!ins||ins.pass!==pass){err.textContent='Correo o contraseña incorrectos.';err.style.display='block';return}
+  if(!esActivo(ins)){err.textContent='Tu cuenta está inactiva. Contactá al administrador.';err.style.display='block';return}
+  err.style.display='none';
+  session={role:'prof',id:ins.id};
+  if(ins.mustChange){
+    hide('login-screen');show('changepass-screen','flex');
+  }else{enterApp()}
+};
+document.getElementById('lg-pass').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('lg-enter').click()});
+
+// login admin (correo + contraseña, contra la lista de administradores)
+document.getElementById('lg-admin-enter').onclick=()=>{
+  const mail=document.getElementById('lg-admin-mail').value.trim().toLowerCase();
+  const pass=document.getElementById('lg-admin-pass').value;
+  const err=document.getElementById('lg-admin-error');
+  const adm=admins.find(a=>(a.mail||'').toLowerCase()===mail);
+  if(!adm||adm.pass!==pass){err.textContent='Correo o contraseña de administrador incorrectos.';err.style.display='block';return}
+  err.style.display='none';session={role:'admin',id:adm.id};enterApp();
+};
+document.getElementById('lg-admin-pass').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('lg-admin-enter').click()});
+
+// cambio de contraseña 1ª vez
+document.getElementById('cp-save').onclick=()=>{
+  const p1=document.getElementById('cp-pass1').value, p2=document.getElementById('cp-pass2').value;
+  const err=document.getElementById('cp-error');
+  if(p1.length<4){err.textContent='La contraseña debe tener al menos 4 caracteres.';err.style.display='block';return}
+  if(p1!==p2){err.textContent='Las contraseñas no coinciden.';err.style.display='block';return}
+  const ins=instructores.find(i=>i.id===session.id);
+  ins.pass=p1;ins.mustChange=false;persist();
+  document.getElementById('cp-pass1').value='';document.getElementById('cp-pass2').value='';
+  err.style.display='none';toast('Contraseña actualizada ✓');enterApp();
+};
+
+document.getElementById('btn-logout').onclick=doLogout;
+
+// administradores
+function renderAdmins(){
+  const t=document.getElementById('adm-tabla');if(!t)return;
+  t.innerHTML=`<table><thead><tr><th>Nombre</th><th>Correo</th><th>Contraseña</th><th></th></tr></thead><tbody>${
+    admins.map(a=>`<tr>
+      <td><input value="${a.nombre||''}" onchange="setAdm('${a.id}','nombre',this.value)" style="font-size:13px;padding:6px 8px"></td>
+      <td><input value="${a.mail||''}" onchange="setAdm('${a.id}','mail',this.value)" style="font-size:13px;padding:6px 8px;min-width:170px"></td>
+      <td><span style="font-family:ui-monospace,monospace;font-size:13px">${a.pass}</span> <button class="del" onclick="regenAdm('${a.id}')" title="Generar otra">↻</button></td>
+      <td class="num">${admins.length>1?`<button class="del" onclick="delAdm('${a.id}')">eliminar</button>`:'<span class="hint" style="font-size:11px">único</span>'}</td>
+    </tr>`).join('')
+  }</tbody></table>`;
+}
+window.setAdm=(id,campo,v)=>{const a=admins.find(x=>x.id===id);if(!a)return;
+  v=v.trim();
+  if(campo==='mail'&&v&&admins.some(x=>x.id!==id&&(x.mail||'').toLowerCase()===v.toLowerCase()))return toast('Ese correo ya está en uso');
+  a[campo]=v;persist();};
+window.regenAdm=id=>{const a=admins.find(x=>x.id===id);if(a){a.pass=genPass();persist();renderAdmins();toast('Nueva contraseña: '+a.pass)}};
+window.delAdm=id=>{if(admins.length<=1)return toast('Debe quedar al menos un administrador');
+  if(session&&session.role==='admin'&&session.id===id)return toast('No podés eliminar el administrador con el que entraste');
+  admins=admins.filter(a=>a.id!==id);persist();renderAdmins()};
+document.getElementById('adm-add').onclick=()=>{
+  const nombre=document.getElementById('adm-nombre').value.trim();
+  const mail=document.getElementById('adm-mail').value.trim();
+  let pass=document.getElementById('adm-newpass').value.trim();
+  if(!nombre)return toast('Falta el nombre');
+  if(!mail)return toast('Falta el correo');
+  if(admins.some(a=>(a.mail||'').toLowerCase()===mail.toLowerCase()))return toast('Ese correo ya está en uso');
+  if(!pass)pass=genPass();
+  admins.push({id:uid(),nombre,mail,pass});persist();
+  document.getElementById('adm-nombre').value='';document.getElementById('adm-mail').value='';document.getElementById('adm-newpass').value='';
+  renderAdmins();toast('Administrador agregado · contraseña '+pass);
+};
+
+// arranque: mostrar login
+show('login-screen','flex');
+</script>
+</body>
+</html>
